@@ -1,0 +1,5 @@
+{
+  "name": "SpecGuard",
+  "description": "AI-powered engineering intelligence for Pull Request reviews against documented standards.",
+  "requestFramePermissions": []
+}
