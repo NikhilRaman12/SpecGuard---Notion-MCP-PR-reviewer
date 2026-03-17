@@ -1,20 +1,81 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# SpecGuard 🛡️
 
-# Run and deploy your AI Studio app
+> AI-powered PR reviewer with institutional memory — powered by Notion MCP.
 
-This contains everything you need to run your app locally.
+![Claude](https://img.shields.io/badge/AI-Claude%20Sonnet%204-orange) ![Notion MCP](https://img.shields.io/badge/Notion-MCP-black) ![Next.js](https://img.shields.io/badge/Next.js-14-black) ![License](https://img.shields.io/badge/License-MIT-blue)
 
-View your app in AI Studio: https://ai.studio/apps/6581a247-aff4-4a25-9727-ae1e18952218
+---
 
-## Run Locally
+## The Problem
 
-**Prerequisites:**  Node.js
+Your team documents decisions in Notion — ADRs, coding standards, architecture specs. But every AI code review tool is blind to them. PRs get merged that silently violate months of decisions.
 
+**SpecGuard fixes this.**
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+---
+
+## How It Works
+
+When a PR is opened, SpecGuard:
+
+1. Fetches the diff from GitHub
+2. Uses **Claude + Notion MCP** to search your entire workspace
+3. Flags violations with links to exact Notion pages
+4. Scores PR risk 0–100
+5. Posts a review comment to GitHub
+6. Logs the review back to Notion (bidirectional)
+7. Sends a Slack digest to the team
+
+---
+
+## Stack
+
+| | |
+|---|---|
+| AI Reasoning | Anthropic Claude Sonnet 4 |
+| Knowledge Layer | Notion MCP |
+| Trigger | GitHub Webhooks |
+| Notifications | Slack |
+| Dashboard | Next.js 14 + Vercel |
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/NikhilRamanK/specguard
+cd specguard
+npm install
+cp .env.example .env   # add your API keys
+npm run dev
+```
+
+**Environment variables:**
+```env
+ANTHROPIC_API_KEY=sk-ant-...
+GITHUB_TOKEN=ghp_...
+GITHUB_WEBHOOK_SECRET=...
+SLACK_WEBHOOK_URL=https://hooks.slack.com/...
+```
+
+**Add GitHub webhook:**
+```
+Payload URL: https://your-app.vercel.app/api/webhook/github
+Events: Pull requests
+```
+
+---
+
+## Built For
+
+**Global Hack Week: Cloud — Notion AI Challenge** by MLH × Notion
+
+---
+
+## Author
+
+**NikhilRaman K**  
+AI/ML Engineer | Data Scientist | GenAI & LLM Systems (RAG, Agents, Fine-Tuning) | Python
+https://www.linkedin.com/in/nikhil-raman-k-448589201/?skipRedirect=true
+
+---
