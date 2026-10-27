@@ -2,6 +2,7 @@ import express, { type Express, type Request, type Response } from "express";
 import cors from "cors";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import dotenv from "dotenv";
 import { Client } from "@notionhq/client";
 import { Octokit } from "octokit";
 import { GoogleGenAI } from "@google/genai";
@@ -10,7 +11,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createServer as createViteServer } from "vite";
 
-dotenvConfig();
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,9 +54,7 @@ export type ReviewFinding = z.infer<typeof reviewFindingSchema>;
 export type ReviewResult = z.infer<typeof reviewResultSchema>;
 
 export function parseGitHubPrUrl(rawUrl: string) {
-  if (!rawUrl) {
-    throw new Error("GitHub PR URL is required.");
-  }
+  if (!rawUrl) throw new Error("GitHub PR URL is required.");
 
   let url: URL;
   try {
@@ -117,6 +116,18 @@ export function extractTextFromProperties(properties: Record<string, unknown> | 
   return sanitizeText(chunks.filter(Boolean).join(" "), 8000);
 }
 
+export function extractTitleFromPage(page: any) {
+  const properties = page?.properties ?? {};
+  const titleProp = properties.Title || properties.Name || Object.values(properties).find((prop: any) => prop?.type === "title");
+  if (titleProp?.title && Array.isArray(titleProp.title)) {
+    return titleProp.title.map((part: any) => part.plain_text ?? "").join("") || "Untitled";
+  }
+  if (typeof page?.properties?.Name?.title?.[0]?.plain_text === "string") {
+    return page.properties.Name.title[0].plain_text;
+  }
+  return "Untitled";
+}
+
 export function selectRelevantNotionContext(prText: string, pages: Array<{ title: string; excerpt: string; url?: string }>) {
   const keywords = Array.from(
     new Set(
@@ -129,9 +140,7 @@ export function selectRelevantNotionContext(prText: string, pages: Array<{ title
     ),
   );
 
-  if (keywords.length === 0) {
-    return pages.slice(0, 3);
-  }
+  if (keywords.length === 0) return pages.slice(0, 3);
 
   const scored = pages
     .map((page) => {
@@ -218,9 +227,7 @@ export function parseReviewResponse(rawText: string) {
 }
 
 async function queryNotionDatabase(notion: Client, databaseId: string, projectText: string) {
-  if (!databaseId) {
-    throw new Error("Notion database configuration is missing.");
-  }
+  if (!databaseId) throw new Error("Notion database configuration is missing.");
 
   const pages: Array<{ title: string; excerpt: string; url?: string }> = [];
   let cursor: string | undefined = undefined;
@@ -249,18 +256,6 @@ async function queryNotionDatabase(notion: Client, databaseId: string, projectTe
   return selectRelevantNotionContext(projectText, pages).slice(0, 5);
 }
 
-export function extractTitleFromPage(page: any) {
-  const properties = page?.properties ?? {};
-  const titleProp = properties.Title || properties.Name || Object.values(properties).find((prop: any) => prop?.type === "title");
-  if (titleProp?.title && Array.isArray(titleProp.title)) {
-    return titleProp.title.map((part: any) => part.plain_text ?? "").join("") || "Untitled";
-  }
-  if (typeof page?.properties?.Name?.title?.[0]?.plain_text === "string") {
-    return page.properties.Name.title[0].plain_text;
-  }
-  return "Untitled";
-}
-
 export async function fetchGithubPullRequestData(octokit: Octokit, prUrl: string) {
   const { owner, repo, pullNumber } = parseGitHubPrUrl(prUrl);
   const { data: pullRequest } = await octokit.rest.pulls.get({ owner, repo, pull_number: pullNumber });
@@ -268,9 +263,7 @@ export async function fetchGithubPullRequestData(octokit: Octokit, prUrl: string
     owner,
     repo,
     pull_number: pullNumber,
-    headers: {
-      accept: "application/vnd.github.v3.diff",
-    },
+    headers: { accept: "application/vnd.github.v3.diff" },
   });
 
   const diff = typeof diffResponse.data === "string" ? diffResponse.data : "";
@@ -305,9 +298,7 @@ async function callGoogleModel(prompt: string) {
   });
 
   const text = typeof response?.text === "string" ? response.text : String(response || "");
-  if (!text) {
-    throw new Error("Google AI returned an empty response.");
-  }
+  if (!text) throw new Error("Google AI returned an empty response.");
 
   return text;
 }
@@ -316,6 +307,7 @@ export async function generateReviewResult(prTitle: string, prBody: string, diff
   const prompt = buildModelPrompt(prTitle, prBody, diff, evidence);
   const rawText = await callGoogleModel(prompt);
   const parsed = parseReviewResponse(rawText);
+
   const findings = parsed.findings.map((finding) => ({
     ...finding,
     source_url: finding.source_url || evidence[0]?.url || "",
@@ -427,7 +419,9 @@ export function createApp() {
     } catch (error: any) {
       const message = error?.message || "Unknown server error.";
       const status = error?.status || 500;
-      const safeMessage = message.includes("rate limit") ? "GitHub rate limit reached. Please wait a moment and retry." : message;
+      const safeMessage = message.includes("rate limit")
+        ? "GitHub rate limit reached. Please wait a moment and retry."
+        : message;
       return res.status(status).json({ error: safeMessage });
     }
   });
@@ -463,14 +457,4 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     console.error("Failed to start SpecGuard server:", error);
     process.exit(1);
   });
-}
-
-function dotenvConfig() {
-  if (process.env.NODE_ENV === "test") return;
-  try {
-    const dotenv = require("dotenv");
-    dotenv.config();
-  } catch {
-    // no-op for environments without dotenv
-  }
 }
