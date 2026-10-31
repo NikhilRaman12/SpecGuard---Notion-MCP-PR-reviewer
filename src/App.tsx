@@ -71,12 +71,32 @@ export default function App() {
         body: JSON.stringify({ prUrl: trimmed }),
       });
 
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload?.error || "Review failed.");
+      const responseText = await response.text();
+      let payload: { error?: string; review?: ReviewPayload } | null = null;
+
+      if (responseText.trim()) {
+        try {
+          payload = JSON.parse(responseText) as { error?: string; review?: ReviewPayload };
+        } catch {
+          throw new Error(
+            `The API returned a non-JSON response (HTTP ${response.status}). Open http://localhost:3000/api/health and make sure the Express server is running on port 3000.`,
+          );
+        }
+      } else {
+        throw new Error(
+          `The API returned an empty response (HTTP ${response.status}). Make sure you opened SpecGuard at http://localhost:3000, not the Vite preview port.`,
+        );
       }
 
-      setResult(payload.review as ReviewPayload);
+      if (!response.ok) {
+        throw new Error(payload?.error || `Review failed (HTTP ${response.status}).`);
+      }
+
+      if (!payload?.review) {
+        throw new Error("The API response did not contain a review. Check the Express terminal for the backend error.");
+      }
+
+      setResult(payload.review);
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : "Review request failed.";
       setError(message);
