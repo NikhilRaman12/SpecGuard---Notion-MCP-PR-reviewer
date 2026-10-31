@@ -39,7 +39,7 @@ export const reviewFindingSchema = z.object({
   line_number: z.number().int().positive().optional(),
   recommendation: z.string().min(1),
   knowledge_gaps: z.array(z.string()).default([]),
-  evidence_backed: z.boolean().default(true),
+  evidence_backed: z.boolean().default(false),
 });
 
 export const reviewResultSchema = z.object({
@@ -216,7 +216,9 @@ Rules:
 - This triage_score is a prioritization score for engineering follow-up, not a probability of a defect.
 - Put findings in order by importance.
 - Only include file_path and line_number when the diff directly supports them.
-- If evidence is not directly relevant, set evidence_backed false and explain in the finding.
+- evidence_quote must be an exact, contiguous quote from one retrieved Notion excerpt; do not paraphrase it.
+- source_url must be the URL of that same Notion page. Never use a different page URL as a fallback.
+- Set evidence_backed true only when both the exact quote and matching Notion page URL are present; otherwise set it false and explain the limitation.
 - If no relevant evidence found, summarize that explicitly and leave findings empty.`;
 }
 
@@ -308,11 +310,22 @@ export async function generateReviewResult(prTitle: string, prBody: string, diff
   const rawText = await callGoogleModel(prompt);
   const parsed = parseReviewResponse(rawText);
 
-  const findings = parsed.findings.map((finding) => ({
-    ...finding,
-    source_url: finding.source_url || evidence[0]?.url || "",
-    evidence_backed: finding.evidence_backed ?? true,
-  }));
+  const findings = parsed.findings.map((finding) => {
+    const citedEvidence = evidence.find((item) => Boolean(item.url) && item.url === finding.source_url);
+    const quote = finding.evidence_quote.trim();
+    const quoteMatches = Boolean(
+      citedEvidence?.excerpt &&
+      quote.length > 0 &&
+      citedEvidence.excerpt.toLocaleLowerCase().includes(quote.toLocaleLowerCase()),
+    );
+    const evidenceBacked = Boolean(finding.evidence_backed && citedEvidence && quoteMatches);
+
+    return {
+      ...finding,
+      source_url: evidenceBacked ? citedEvidence!.url || "" : "",
+      evidence_backed: evidenceBacked,
+    };
+  });
 
   return {
     ...parsed,
