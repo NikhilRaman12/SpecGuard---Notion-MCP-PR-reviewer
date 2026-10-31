@@ -44,7 +44,7 @@ npm install
 npm run dev
 ```
 
-The frontend runs at `http://localhost:5173` in Vite dev mode and the backend is served through the Express app on `http://localhost:3000`.
+The Express server starts on `http://localhost:3000` and mounts Vite in middleware mode. Open **only** `http://localhost:3000` for local development. Do not open the Vite preview port (for example, `4173`) because the preview server does not host the `/api/review-pr` backend route.
 
 ## Production build
 
